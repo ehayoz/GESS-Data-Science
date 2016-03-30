@@ -121,7 +121,7 @@ void cleanup() {
 void concat() {
 	long minTime = getMinTime(true);
 	long maxTime = getMinTime(false);
-	int m1 = 0;
+	int m1 = 0 + 1; // [FIX, +1]
 	int m2 = 0 + 1; // fix empty line
 	int m3 = 0 + 1;
 	int m3_prev = 1;
@@ -164,8 +164,8 @@ void concat() {
 		if(n_device < 0)
 			n_device = 0;
 		
-		// FOUT [Time],[HR],[EDA],[Temp],
-		fout[0] << t << ',' << readLine(0, (t-Tmin_i[0])*f_hr+2) << ',' << readLine(4, (t-Tmin_i[4])*f_eda+2) << ',' << readLine(5, (t-Tmin_i[5])*f_temp+2) << ','
+		// FOUT [Time],[HR],[EDA],[Temp],						[FIX,-1]									[FIX,-1]
+		fout[0] << t << ',' << readLine(0, (t-Tmin_i[0])*f_hr+2-1) << ',' << readLine(4, (t-Tmin_i[4])*f_eda+2-1) << ',' << readLine(5, (t-Tmin_i[5])*f_temp+2) << ','
 		// FOUT [Sound],[Dust],
 			 << getSound(readLine(2,m2)) << ',' << getDust(readLine(2,m2)) << ','
 		// FOUT [WiFi]
