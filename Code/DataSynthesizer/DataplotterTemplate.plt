@@ -176,26 +176,49 @@ GNUTERM = "wxt"
 
 #actual program
 #set separator char
+
+#alternatively plot data to png
+set terminal png size 3000,2000 enhanced font "Helvetica,20" 
+
+set output "alldata.png"
+
+
 set datafile separator ","
+
+#set multiplot layout 2,2
 
 #read time properly on x axis change accordingly
 set style data fsteps
 set timefmt "%s"
-set format x "%m/%d/%Y %H:%M:%S"
+set format x "%H:%M:%S"
 set xdata time
 set grid
 set key left
 
-set title "Time to Pulse Plot"
+set title "Time to Data Plot"
 set xlabel "Date"
-set ylabel "Pulse"
+#set ylabel "Data"
 
 #plotting data from column 1 in x axis and column 2 in y axis
-plot "Data_all.csv" using 1:2 with linespoints
 
-#alternatively plot data to png
-#set output "output.png"
+plot "Data_all.csv" using 1:2 title "HR" with lines, "" using 1:3 title "EDA" with lines, "" using 1:4 title "Temp" with lines, "" using 1:5 title "Sound" with lines, "" using 1:6 title "Dust" with lines, "" using 1:7 title "#Wifi" with lines
+
+set output "HR-EDA.png"
+
+set format x
+set title "HR to EDA Plot"
+set xlabel "HR"
+set ylabel "EDA"
+
+plot "Data_all.csv" using 2:3 title "HR-EDA" with points
 
 
+set output "Lon-Lat.png"
 
+set format x
+set title "Position Plot"
+set xlabel "Lon"
+set ylabel "Lat"
+
+plot "Data_all.csv" using 8:9 title "Position" with linespoints
 #    EOF
