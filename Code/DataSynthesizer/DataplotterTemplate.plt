@@ -14,176 +14,11 @@
 # set output
 
 
-#Scroll down to actual program
-#Short info-tutorial:
-#https://www.uni-muenster.de/NWZ/Hilfe/Nutzer/Anleitungen/Allgemein/Gnuplot.html
-
-
-unset clip points
-set clip one
-unset clip two
-set bar 1.000000 front
-set border 31 front lt black linewidth 1.000 dashtype solid
-set zdata 
-set ydata 
-set xdata 
-set y2data 
-set x2data 
-set boxwidth
-set style fill  empty border
-set style rectangle back fc  bgnd fillstyle   solid 1.00 border lt -1
-set style circle radius graph 0.02, first 0.00000, 0.00000 
-set style ellipse size graph 0.05, 0.03, first 0.00000 angle 0 units xy
-set dummy x, y
-set format x "% h" 
-set format y "% h" 
-set format x2 "% h" 
-set format y2 "% h" 
-set format z "% h" 
-set format cb "% h" 
-set format r "% h" 
-set timefmt "%d/%m/%y,%H:%M"
-set angles radians
-set tics back
-unset grid
-set raxis
-set style parallel front  lt black linewidth 2.000 dashtype solid
-set key title "" center
-set key inside right top vertical Right noreverse enhanced autotitle nobox
-set key noinvert samplen 4 spacing 1 width 0 height 0 
-set key maxcolumns 0 maxrows 0
-set key noopaque
-unset label
-unset arrow
-set style increment default
-unset style line
-unset style arrow
-set style histogram clustered gap 2 title textcolor lt -1
-unset object
-set style textbox transparent margins  1.0,  1.0 border
-unset logscale
-set offsets 0, 0, 0, 0
-set pointsize 1
-set pointintervalbox 1
-set encoding default
-unset polar
-unset parametric
-unset decimalsign
-set view 60, 30, 1, 1
-set samples 100, 100
-set isosamples 10, 10
-set surface 
-unset contour
-set cntrlabel  format '%8.3g' font '' start 5 interval 20
-set mapping cartesian
-set datafile separator whitespace
-unset hidden3d
-set cntrparam order 4
-set cntrparam linear
-set cntrparam levels auto 5
-set cntrparam points 5
-set size ratio 0 1,1
-set origin 0,0
-set style data points
-set style function lines
-unset xzeroaxis
-unset yzeroaxis
-unset zzeroaxis
-unset x2zeroaxis
-unset y2zeroaxis
-set xyplane relative 0.5
-set tics scale  1, 0.5, 1, 1, 1
-set mxtics default
-set mytics default
-set mztics default
-set mx2tics default
-set my2tics default
-set mcbtics default
-set mrtics default
-set xtics border in scale 1,0.5 mirror norotate  autojustify
-set xtics  norangelimit autofreq 
-set ytics border in scale 1,0.5 mirror norotate  autojustify
-set ytics  norangelimit autofreq 
-set ztics border in scale 1,0.5 nomirror norotate  autojustify
-set ztics  norangelimit autofreq 
-unset x2tics
-unset y2tics
-set cbtics border in scale 1,0.5 mirror norotate  autojustify
-set cbtics  norangelimit autofreq 
-set rtics axis in scale 1,0.5 nomirror norotate  autojustify
-set rtics  norangelimit autofreq 
-unset paxis 1 tics
-unset paxis 2 tics
-unset paxis 3 tics
-unset paxis 4 tics
-unset paxis 5 tics
-unset paxis 6 tics
-unset paxis 7 tics
-set title "" 
-set title  font "" norotate
-set timestamp bottom 
-set timestamp "" 
-set timestamp  font "" norotate
-set rrange [ * : * ] noreverse nowriteback
-set trange [ * : * ] noreverse nowriteback
-set urange [ * : * ] noreverse nowriteback
-set vrange [ * : * ] noreverse nowriteback
-set xlabel "" 
-set xlabel  font "" textcolor lt -1 norotate
-set x2label "" 
-set x2label  font "" textcolor lt -1 norotate
-set xrange [ * : * ] noreverse nowriteback
-set x2range [ * : * ] noreverse nowriteback
-set ylabel "" 
-set ylabel  font "" textcolor lt -1 rotate by -270
-set y2label "" 
-set y2label  font "" textcolor lt -1 rotate by -270
-set yrange [ * : * ] noreverse nowriteback
-set y2range [ * : * ] noreverse nowriteback
-set zlabel "" 
-set zlabel  font "" textcolor lt -1 norotate
-set zrange [ * : * ] noreverse nowriteback
-set cblabel "" 
-set cblabel  font "" textcolor lt -1 rotate by -270
-set cbrange [ * : * ] noreverse nowriteback
-set paxis 1 range [ * : * ] noreverse nowriteback
-set paxis 2 range [ * : * ] noreverse nowriteback
-set paxis 3 range [ * : * ] noreverse nowriteback
-set paxis 4 range [ * : * ] noreverse nowriteback
-set paxis 5 range [ * : * ] noreverse nowriteback
-set paxis 6 range [ * : * ] noreverse nowriteback
-set paxis 7 range [ * : * ] noreverse nowriteback
-set zero 1e-008
-set lmargin  -1
-set bmargin  -1
-set rmargin  -1
-set tmargin  -1
-set locale "German_Germany.1252"
-set pm3d explicit at s
-set pm3d scansautomatic
-set pm3d interpolate 1,1 flush begin noftriangles noborder corners2color mean
-set palette positive nops_allcF maxcolors 0 gamma 1.5 color model RGB 
-set palette rgbformulae 7, 5, 15
-set colorbox default
-set colorbox vertical origin screen 0.9, 0.2, 0 size screen 0.05, 0.6, 0 front bdefault
-set style boxplot candles range  1.50 outliers pt 7 separation 1 labels auto unsorted
-set loadpath 
-set fontpath 
-set psdir
-set fit brief errorvariables nocovariancevariables errorscaling prescale nowrap v5
-GNUTERM = "wxt"
-
-
-#actual program
 #set separator char
+set datafile separator ","
 
 #alternatively plot data to png
 set terminal png size 3000,2000 enhanced font "Helvetica,20" 
-
-set output "alldata.png"
-
-
-set datafile separator ","
 
 #set multiplot layout 2,2
 
@@ -195,30 +30,195 @@ set xdata time
 set grid
 set key left
 
+
+
+set output "alldata.png"
 set title "Time to Data Plot"
 set xlabel "Date"
 #set ylabel "Data"
-
-#plotting data from column 1 in x axis and column 2 in y axis
-
 plot "Data_all.csv" using 1:2 title "HR" with lines, "" using 1:3 title "EDA" with lines, "" using 1:4 title "Temp" with lines, "" using 1:5 title "Sound" with lines, "" using 1:6 title "Dust" with lines, "" using 1:7 title "#Wifi" with lines
 
-set output "HR-EDA.png"
 
+#plot 1 HR
+set output "HR-EDA.png"
 set format x
 set title "HR to EDA Plot"
 set xlabel "HR"
 set ylabel "EDA"
-
 plot "Data_all.csv" using 2:3 title "HR-EDA" with points
 
 
-set output "Lon-Lat.png"
 
+
+#plot 2
+set output "HR-Temp.png"
+set format x
+set title "HR to Temp Plot"
+set xlabel "HR"
+set ylabel "Temp"
+plot "Data_all.csv" using 2:4 title "HR-Temp" with points
+
+
+
+
+#plot 3
+set output "HR-Sound.png"
+set format x
+set title "HR to Sound Plot"
+set xlabel "HR"
+set ylabel "Sound"
+plot "Data_all.csv" using 2:5 title "HR-Sound" with points
+
+
+
+
+#plot 4
+set output "HR-Dust.png"
+set format x
+set title "HR to Dust Plot"
+set xlabel "HR"
+set ylabel "Dust"
+plot "Data_all.csv" using 2:6 title "HR-Dust" with points
+
+
+
+
+#plot 5
+set output "HR-Wifi.png"
+set format x
+set title "HR to Wifi Plot"
+set xlabel "HR"
+set ylabel "Wifi"
+plot "Data_all.csv" using 2:7 title "HR-Wifi" with points
+
+
+
+
+#plot 6 EDA
+set output "EDA-Temp.png"
+set format x
+set title "EDA to Temp Plot"
+set xlabel "EDA"
+set ylabel "Temp"
+plot "Data_all.csv" using 3:4 title "EDA-Temp" with points
+
+
+
+
+#plot 7
+set output "EDA-Sound.png"
+set format x
+set title "EDA to Sound Plot"
+set xlabel "EDA"
+set ylabel "Sound"
+plot "Data_all.csv" using 3:5 title "EDA-Sound" with points
+
+
+
+
+#plot 8
+set output "EDA-Dust.png"
+set format x
+set title "EDA to Dust Plot"
+set xlabel "EDA"
+set ylabel "Dust"
+plot "Data_all.csv" using 3:6 title "EDA-Dust" with points
+
+
+
+
+#plot 9
+set output "EDA-Wifi.png"
+set format x
+set title "EDA to Wifi Plot"
+set xlabel "EDA"
+set ylabel "Wifi"
+plot "Data_all.csv" using 3:7 title "EDA-Wifi" with points
+
+
+
+
+#plot 10 Temp
+set output "Temp-Sound.png"
+set format x
+set title "Temp to Sound Plot"
+set xlabel "Temp"
+set ylabel "Sound"
+plot "Data_all.csv" using 4:5 title "Temp-Sound" with points
+
+
+
+
+#plot 11
+set output "Temp-Dust.png"
+set format x
+set title "Temp to Dust Plot"
+set xlabel "Temp"
+set ylabel "Dust"
+plot "Data_all.csv" using 4:6 title "Temp-Dust" with points
+
+
+
+
+#plot 12
+set output "Temp-Wifi.png"
+set format x
+set title "Temp to Wifi Plot"
+set xlabel "Temp"
+set ylabel "Wifi"
+plot "Data_all.csv" using 4:7 title "Temp-Wifi" with points
+
+
+
+
+#plot 13 Sound
+set output "Sound-Dust.png"
+set format x
+set title "Sound to Dust Plot"
+set xlabel "Sound"
+set ylabel "Dust"
+plot "Data_all.csv" using 5:6 title "Sound-Dust" with points
+
+
+
+
+#plot 14
+set output "Sound-Wifi.png"
+set format x
+set title "Sound to Wifi Plot"
+set xlabel "Sound"
+set ylabel "Wifi"
+plot "Data_all.csv" using 5:7 title "Sound-Wifi" with points
+
+
+
+
+#plot 15 Dust
+set output "Dust-Wifi.png"
+set format x
+set title "Dust to Wifi Plot"
+set xlabel "Dust"
+set ylabel "Wifi"
+plot "Data_all.csv" using 6:7 title "Dust-Wifi" with points
+
+
+
+
+
+set output "Lon-Lat.png"
 set format x
 set title "Position Plot"
 set xlabel "Lon"
 set ylabel "Lat"
-
 plot "Data_all.csv" using 8:9 title "Position" with linespoints
+
+#print stats
+set terminal wxt 0 enhanced
+set print "EDA-EDA.txt"
+#why is it not working i'm confused, realy
+stats 'Data_all.csv' us 1
+print "test"
+unset print
+
+
 #    EOF
