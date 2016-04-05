@@ -16,7 +16,7 @@
 
 using namespace std;
 
-string inFileName = "Data_all.csv";
+string inFileName = "Data_all.csv"; //Source file #1 we can add as many as we want
 
 struct Line ///time, HR, EDA. Temp, Sound, Dust, Wifi, Lon, Lat
 {
@@ -31,15 +31,17 @@ struct DataSet
 DataSet readfile(string filename, int columns);
 void printData(DataSet Sample);
 void writeDtoF(DataSet Sample, string filename);
+void pauseoutput(void){cout << "\nPress Enter to continue\n"; cin.get();}
 
 int main()
 {
-    DataSet Set1 = readfile(inFileName, 9);
-    printData(Set1);
-    writeDtoF(Set1, "test.csv");
+    DataSet Set1 = readfile(inFileName, 9); /// reading file
+    printData(Set1); /// printing on the cmd window
+    writeDtoF(Set1, "test.csv"); /// writing comma-separated to file
+    pauseoutput();
 
     /// delete array
-    delete Set1.Startzeile;
+    delete Set1.Startzeile; /// deleting Pointer, has to be done for every Dataset.
     return 0;
 }
 
