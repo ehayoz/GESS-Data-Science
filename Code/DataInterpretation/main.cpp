@@ -36,7 +36,7 @@ void pauseoutput(void){cout << "\nPress Enter to continue\n"; cin.get();}
 int main()
 {
     DataSet Set1 = readfile(inFileName, 9); /// reading file
-    printData(Set1); /// printing on the cmd window
+    //printData(Set1); /// printing on the cmd window
     writeDtoF(Set1, "test.csv"); /// writing comma-separated to file
     pauseoutput();
 
