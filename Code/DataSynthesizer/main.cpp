@@ -1,5 +1,4 @@
 #include <iostream>
-#include <windows.h>
 #include <fstream>
 #include <cstdlib>
 #include <cstring>
@@ -7,7 +6,6 @@
 #include <chrono>
 #include <climits>
 #include <cmath>
-#include <sstream>
 
 using namespace std;
 using namespace std::chrono;
@@ -40,7 +38,6 @@ float f_ms = 0.016;
 ifstream fin[6];
 const int N = (sizeof(fin)/sizeof(fin[0]));
 ofstream fout[2];
-ostringstream sout[2]; // VON MIR ERGAENZT, ERSETZT fout << schlaufe am ende von Concat schreibt dann nach fout. Zeilen: (170, 179, 184-191)
 int No = (sizeof(fout)/sizeof(fout[0]));
 long Tmin_i[N];
 
@@ -64,7 +61,7 @@ int main(int argc, char** argv) {
 	init();
 	concat();
 	//check();
-
+	
 	cleanup();
 	return 0;
 }
@@ -80,7 +77,6 @@ void init() {
   fout[1].open("GPS_only.csv");
   for(int i = 0; i < No; i++)
 	 fout[i].precision(15);
-	 system("color D");
 }
 
 void check() {
@@ -92,7 +88,7 @@ void check() {
 		// Count lines
 		for (n = 0; std::getline(fin[i], line); n++)
     		;
-
+		
 		// Check if number of lines match with device frequencies
 		switch(i) {
 			case 0: n_max = n;
@@ -132,12 +128,12 @@ void concat() {
 	int n_device = 0;
 	int progress = 0;
 	int progress_prev = 0;
-
+	
 	//long t = minTime;
-
+	
 	// Get to "common" time
 	// Base is HR (has to be specified in advance)
-
+	
 	for(double t = minTime; t < maxTime; t += 1/f_hr) {
 		progress = ceil((double)(t-minTime)/(maxTime - minTime)* 100);
 		if(progress != progress_prev) {
@@ -146,11 +142,11 @@ void concat() {
 			cout << "Generating Data Files. " << "Progress: " << progress << "%";
 			progress_prev = progress;
 		}
-
+		
 		// is for [Sound],[Dust],
 		while(time2stamp1(2,m2) <= t) {
 			m2++;
-		}
+		}	
 		// is for [LON],[LAT]
 		while(time2stamp1(1,m1) <= t) {
 			m1++;
@@ -159,7 +155,7 @@ void concat() {
 		while(time2stamp2(3,m3) <= t) {
 			m3++;
 		}
-
+		
 		if(m3 != m3_prev)	// only refresh n_device if there is a new measure
 		{
 			n_device = m3 - m3_prev - 2;	// substract 2 because of our devices
@@ -167,9 +163,9 @@ void concat() {
 		}
 		if(n_device < 0)
 			n_device = 0;
-
+		
 		// FOUT [Time],[HR],[EDA],[Temp],						[FIX,-1]									[FIX,-1]
-		sout[0] << t << ',' << readLine(0, (t-Tmin_i[0])*f_hr+2-1) << ',' << readLine(4, (t-Tmin_i[4])*f_eda+2-1) << ',' << readLine(5, (t-Tmin_i[5])*f_temp+2) << ','
+		fout[0] << t << ',' << readLine(0, (t-Tmin_i[0])*f_hr+2-1) << ',' << readLine(4, (t-Tmin_i[4])*f_eda+2-1) << ',' << readLine(5, (t-Tmin_i[5])*f_temp+2) << ','
 		// FOUT [Sound],[Dust],
 			 << getSound(readLine(2,m2)) << ',' << getDust(readLine(2,m2)) << ','
 		// FOUT [WiFi]
@@ -178,20 +174,10 @@ void concat() {
 			 << getLON(readLine(1,m1)) << ',' << getLAT(readLine(1,m1)) << endl;
 
 	    // FOUT [LON],[LAT]
-		sout[1] << getLON(readLine(1,m1)) << ',' << getLAT(readLine(1,m1)) << endl;
-
+		fout[1] << getLON(readLine(1,m1)) << ',' << getLAT(readLine(1,m1)) << endl;
+		
 		m3_prev = m3;
 	}
-
-	//VON MIR ERGAENZT START
-	string str[2];
-	for(int i = 0; i<2; ++i)
-    {
-        string str[i] = sout[i].str();
-        fout[i] << str[i];
-    }
-    //VON MIR ERGAENZT ENDE
-
 	cout  << " ...Success!" << endl << endl;
 }
 
@@ -200,7 +186,7 @@ string readLine(int n_i, int m) {
 	fin[n_i].clear();
 	fin[n_i].seekg(0, ios::beg);
 	string line;
-
+	
 	if(m == -1) {
 		// get last line
     	while (fin[n_i] >> std::ws && std::getline(fin[n_i], line)) // skip empty lines
@@ -211,7 +197,7 @@ string readLine(int n_i, int m) {
 			std::getline(fin[n_i], line);
 		}
 	}
-
+	
 	return line;
 }
 
@@ -220,22 +206,22 @@ string getLAT(string line) {
 	// LON: entry after 15th comma
 	int field_start = 0;
 	int field_end = 0;
-
+	
 	// find "starting" comma
 	for(int i = 0; i < 13; i++)
 		field_start = line.find(',',field_start+1);
 	field_start++;
-
+	
 	// find "ending" comma
 	for(int i = 0; i < 14; i++)
 		field_end = line.find(',',field_end+1);
-
+		
 	line = line.substr(field_start, field_end - field_start);
 	if(line.length() > 5) {
 		line.erase(4,1);
 		line.insert(2,".");
 	}
-
+	
 	return line;
 }
 
@@ -244,61 +230,61 @@ string getLON(string line) {
 	// LON: entry after 15th comma
 	int field_start = 0;
 	int field_end = 0;
-
+	
 	// find "starting" comma
 	for(int i = 0; i < 15; i++)
 		field_start = line.find(',',field_start+1);
 	field_start++;
-
+	
 	// find "ending" comma
 	for(int i = 0; i < 16; i++)
 		field_end = line.find(',',field_end+1);
-
-
+		
+	
 	line = line.substr(field_start, field_end - field_start);
 	if(line.length() > 5) {
 		line.erase(5,1);
 		line.insert(3,".");
 	}
-
+	
 	return line;
 }
 
 string getDust(string line) {
 	int field_start = 0;
 	int field_end = 0;
-
+	
 	// find "starting" comma
 	for(int i = 0; i < 3; i++)
 		field_start = line.find(':',field_start+1);
 	field_start += 2;
-
+	
 	// find "ending" comma
 	field_end = line.find('mg',field_end) - 2;
-
+	
 	return line.substr(field_start, field_end - field_start);
 }
 
 string getSound(string line) {
 	int field_start = 0;
 	int field_end = 0;
-
+	
 	// find "starting" comma
 	field_start = line.find(':',field_start+1) + 2;
-
+	
 	// find "ending" comma
 	field_end = line.find('dB',field_end) - 2;
-
+	
 	return line.substr(field_start, field_end - field_start);
 }
 
 double time2stamp1(int n_i, int m) {
 	// only for files with the following format:
 	// 2016_03_14_15_32_19_681, ...
-
+	
 	// n_i: Which fin
 	// m: Which line, starting from 0
-
+	
   	// Reference Date (01.01.1970)
 	struct tm referenceDateComponent = {0};
 	referenceDateComponent.tm_hour = 0;
@@ -308,15 +294,15 @@ double time2stamp1(int n_i, int m) {
 	referenceDateComponent.tm_mon = 1;
 	referenceDateComponent.tm_mday = 1;
 	time_t referenceDate = mktime(&referenceDateComponent);
-
+	
 	// Ignore empty lines
 	/*string line = "";
 	while(line.size() < 10) {
 		std::getline(fin[n_i], line);
 	}*/
-
+	
 	string line = readLine(n_i,m);
-
+	
 	// Read File Date
 	referenceDateComponent.tm_hour = stoi(line.substr(11,2));
 	referenceDateComponent.tm_min = stoi(line.substr(14,2));
@@ -325,10 +311,10 @@ double time2stamp1(int n_i, int m) {
 	referenceDateComponent.tm_mon = stoi(line.substr(5,2)) - 1;
 	referenceDateComponent.tm_mday = stoi(line.substr(8,2));
 	time_t readDate = mktime(&referenceDateComponent);
-
-
+	
+	
 	// Print string to check
-	//char buff[20];
+	//char buff[20];	
 	//strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&referenceDate));
 	//cout << buff << endl;
 
@@ -341,10 +327,10 @@ double time2stamp1(int n_i, int m) {
 double time2stamp2(int n_i, int m) {
 	// only for files with the following format:
 	// 14802,"2016-03-14 15:35:56", ...
-
+	
 	// n_i: Which fin
 	// m: Which line, starting from 0
-
+	
   	// Reference Date (01.01.1970)
 	struct tm referenceDateComponent = {0};
 	referenceDateComponent.tm_hour = 0;
@@ -354,21 +340,21 @@ double time2stamp2(int n_i, int m) {
 	referenceDateComponent.tm_mon = 1;
 	referenceDateComponent.tm_mday = 1;
 	time_t referenceDate = mktime(&referenceDateComponent);
-
+	
 	// Ignore empty lines
 	/*string line = "";
 	while(line.size() < 10) {
 		std::getline(fin[n_i], line);
 	}*/
-
+	
 	string line = readLine(n_i,m);
-
+	
 	int field_start = 0;
 	// find "starting" apostroph
 	for(int i = 0; i < 2; i++)
 		field_start = line.find('"',field_start+1);
 	field_start++;
-
+		
 	// Read File Date
 	referenceDateComponent.tm_hour = stoi(line.substr(field_start+11,2));
 	referenceDateComponent.tm_min = stoi(line.substr(field_start+14,2));
@@ -377,10 +363,10 @@ double time2stamp2(int n_i, int m) {
 	referenceDateComponent.tm_mon = stoi(line.substr(field_start+5,2)) - 1;
 	referenceDateComponent.tm_mday = stoi(line.substr(field_start+8,2));
 	time_t readDate = mktime(&referenceDateComponent);
-
-
+	
+	
 	// Print string to check
-	//char buff[20];
+	//char buff[20];	
 	//strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&referenceDate));
 	//cout << buff << endl;
 
@@ -393,14 +379,14 @@ double time2stamp2(int n_i, int m) {
 long getMinTime(bool min) {
 	if(min) {
 		long T_min = 0;
-
+	
 		Tmin_i[0] = stol(readLine(0,0));	// HR
 		Tmin_i[1] = time2stamp1(1,0);		// GPS
 		Tmin_i[2] = time2stamp1(2,0+1);		// WaspCity
 		Tmin_i[3] = time2stamp2(3,0+1);		// WiFi Scanner
 		Tmin_i[4] = stol(readLine(4,0));		// EDA
 		Tmin_i[5] = stol(readLine(5,0));		// TEMP
-
+		
 		cout << "Start Times:" << endl;
 		for(int i = 0; i < N; i++) {
 			cout << Tmin_i[i] << endl;
@@ -414,7 +400,7 @@ long getMinTime(bool min) {
 		long T_max = LONG_MAX;
 		long T_i[N];
 		long N_T[N];
-
+	
 		// Count lines
 		int n;
 		string line;
@@ -429,7 +415,7 @@ long getMinTime(bool min) {
 		T_i[3] = time2stamp2(3,-1);
 		T_i[4] = stol(readLine(4,0)) + N_T[4]*f_eda;		// EDA
 		T_i[5] = stol(readLine(5,0)) + N_T[0]*f_temp;		// TEMP
-
+		
 		cout << "End Times:" << endl;
 		for(int i = 0; i < N; i++) {
 			cout << T_i[i] << endl;
@@ -438,5 +424,5 @@ long getMinTime(bool min) {
 		}
 		cout << endl;
 		return T_max;
-	}
+	}	
 }
