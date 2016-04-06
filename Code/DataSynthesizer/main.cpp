@@ -56,6 +56,10 @@ string readLine(int, int);
 double time2stamp1(int,int);
 double time2stamp2(int,int);
 long getMinTime(bool);
+double WGStoCHx(double, double);
+double WGStoCHy(double, double);
+double DecToSexAngle(double);
+
 
 int main(int argc, char** argv) {
 	init();
@@ -129,6 +133,9 @@ void concat() {
 	int progress = 0;
 	int progress_prev = 0;
 	
+	double CHx;
+	double CHy;
+	
 	//long t = minTime;
 	
 	// Get to "common" time
@@ -164,6 +171,14 @@ void concat() {
 		if(n_device < 0)
 			n_device = 0;
 		
+		// Conversion WGS to CH
+		if(getLON(readLine(1,m1)).compare("") == 0)
+			CHx = CHy = 0;
+		else {
+			CHx = WGStoCHy(stod(getLAT(readLine(1,m1))) , stod(getLON(readLine(1,m1)))); // Convention: x and y reversed!
+			CHy = WGStoCHx(stod(getLAT(readLine(1,m1))) , stod(getLON(readLine(1,m1))));
+		}
+		
 		// FOUT [Time],[HR],[EDA],[Temp],						[FIX,-1]									[FIX,-1]
 		fout[0] << t << ',' << readLine(0, (t-Tmin_i[0])*f_hr+2-1) << ',' << readLine(4, (t-Tmin_i[4])*f_eda+2-1) << ',' << readLine(5, (t-Tmin_i[5])*f_temp+2) << ','
 		// FOUT [Sound],[Dust],
@@ -171,10 +186,11 @@ void concat() {
 		// FOUT [WiFi]
 			 << n_device << ','
 	    // FOUT [LON],[LAT]
-			 << getLON(readLine(1,m1)) << ',' << getLAT(readLine(1,m1)) << endl;
+			 // << getLON(readLine(1,m1)) << ',' << getLAT(readLine(1,m1)) << endl;
+			 << CHx << ',' << CHy << endl;
 
 	    // FOUT [LON],[LAT]
-		fout[1] << getLON(readLine(1,m1)) << ',' << getLAT(readLine(1,m1)) << endl;
+		fout[1] << CHx << ',' << CHy << endl;
 		
 		m3_prev = m3;
 	}
@@ -426,3 +442,84 @@ long getMinTime(bool min) {
 		return T_max;
 	}	
 }
+
+// Convert WGS lat/long (° dec) to CH x
+double WGStoCHx(double lat, double lng) {
+	// Converts dec degrees to sex seconds
+	lat = DecToSexAngle(lat);
+	lng = DecToSexAngle(lng);
+
+	// Auxiliary values (% Bern)
+	double lat_aux = (lat - 169028.66) / 10000;
+	double lng_aux = (lng - 26782.5) / 10000;
+
+	// Process X
+	double x = ((200147.07 + (308807.95 * lat_aux)
+			+ (3745.25 * pow(lng_aux, 2)) + (76.63 * pow(lat_aux,
+			2))) - (194.56 * pow(lng_aux, 2) * lat_aux))
+			+ (119.79 * pow(lat_aux, 3));
+
+	return x;
+}
+
+// Convert WGS lat/long (° dec) to CH y
+double WGStoCHy(double lat, double lng) {
+	// Converts dec degrees to sex seconds
+	lat = DecToSexAngle(lat);
+	lng = DecToSexAngle(lng);
+
+	// Auxiliary values (% Bern)
+	double lat_aux = (lat - 169028.66) / 10000;
+	double lng_aux = (lng - 26782.5) / 10000;
+
+	// Process Y
+	double y = (600072.37 + (211455.93 * lng_aux))
+			- (10938.51 * lng_aux * lat_aux)
+			- (0.36 * lng_aux * pow(lat_aux, 2))
+			- (44.54 * pow(lng_aux, 3));
+
+	return y;
+}
+
+// Convert decimal angle (degrees) to sexagesimal angle (seconds)
+double DecToSexAngle(double dec) {
+	int deg = (int) floor(dec);
+	int min = (int) floor((dec - deg) * 60);
+	double sec = (((dec - deg) * 60) - min) * 60;
+
+	return sec + min*60.0 + deg*3600.0;
+}
+
+//double WGStoCHx(double lat, double lng) {
+//	//converts WGS84 coordinates (lat,long) to the Swiss coordinates. See http://geomatics.ladetto.ch/ch1903_wgs84_de.pdf
+//	//The elevation is supposed to be above sea level, so it does not require any conversion
+//	//lat and long must be decimal (and they will be converted to seconds)
+//	const double phi_p = (lat*3600. - 169028.66) / 10000.;
+//	const double lambda_p = (lng*3600. - 26782.5) / 10000.;
+//	
+//	double east_out = 600072.37
+//		+ 211455.93	* lambda_p
+//		- 10938.51	* lambda_p * phi_p
+//		- 0.36		* lambda_p * (phi_p*phi_p)
+//		- 44.54		* (lambda_p*lambda_p*lambda_p);
+//
+//	return east_out;
+//}
+//
+//double WGStoCHy(double lat, double lng) {
+//	//converts WGS84 coordinates (lat,long) to the Swiss coordinates. See http://geomatics.ladetto.ch/ch1903_wgs84_de.pdf
+//	//The elevation is supposed to be above sea level, so it does not require any conversion
+//	//lat and long must be decimal (and they will be converted to seconds)
+//	const double phi_p = (lat*3600. - 169028.66) / 10000.;
+//	const double lambda_p = (lng*3600. - 26782.5) / 10000.;
+//	
+//	double north_out = 200147.07
+//		+ 308807.95	* phi_p
+//		+ 3745.25	* (lambda_p*lambda_p)
+//		+ 76.63		* (phi_p*phi_p)
+//		- 194.56	* (lambda_p*lambda_p) * phi_p
+//		+ 119.79	* (phi_p*phi_p*phi_p);
+//		
+//	return north_out;
+//}
+
