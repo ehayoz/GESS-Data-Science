@@ -16,14 +16,19 @@
 
 using namespace std;
 
-string inFileName = "Data_all.csv"; //Source file #1 we can add as many as we want
+string inputs = "inputs.txt"; //Source file #1 we can add as many as we want
 
 struct Line ///time, HR, EDA. Temp, Sound, Dust, Wifi, Lon, Lat
 {
-    double data[9];
+    double data[9]; /// set mac column size;
+};
+struct tLine ///Input file names
+{
+    string data[2];
 };
 struct DataSet
 {
+    tLine* inputnames;
     Line* Startzeile;
     int Zeilenzahl;
     int Spaltenzahl;
@@ -31,17 +36,41 @@ struct DataSet
 DataSet readfile(string filename, int columns);
 void printData(DataSet Sample);
 void writeDtoF(DataSet Sample, string filename);
-void pauseoutput(void){cout << "\nPress Enter to continue\n"; cin.get();}
+void pauseoutput(void)
+{
+    cout << "\nPress Enter to continue\n";
+    cin.get();
+}
 
 int main()
 {
-    DataSet Set1 = readfile(inFileName, 9); /// reading file
-    //printData(Set1); /// printing on the cmd window
-    writeDtoF(Set1, "test.csv"); /// writing comma-separated to file
+    DataSet target = readfile(inputs, 2); ///getting input target files, needs to be read as string. Maybe target names as well.
+
+    DataSet* Set = new DataSet[target.Zeilenzahl]; ///Creating #Dataset pointers
+
+    for(int i = 0; i < target.Zeilenzahl; ++i)
+    {
+        Set[i] = readfile(target.inputnames[i].data[0], 9); /// reading file
+        ///Analyzation start
+
+        ///Analyzation end
+
+        //printData(Set1); /// printing on the cmd window
+        writeDtoF(Set[i], target.inputnames[i].data[1]); /// writing comma-separated to file
+    }
+    cout << endl << target.Zeilenzahl << " files written\n";
     pauseoutput();
 
-    /// delete array
-    delete Set1.Startzeile; /// deleting Pointer, has to be done for every Dataset.
+
+
+    /// delete arrays
+    for(int i = 0; i < target.Zeilenzahl; ++i)
+    {
+        delete Set[i].Startzeile; /// deleting Pointer, has to be done for every Dataset.
+        delete Set[i].inputnames;
+    }
+    delete[] Set;
+
     return 0;
 }
 
@@ -66,7 +95,9 @@ DataSet readfile(string filename, int columns)
     /// create Line array of size filelength
 
     Line* Zeile = new Line[filelength];
+    tLine* tZeile = new tLine[filelength]; /// for input files
     Result.Startzeile = Zeile;
+    Result.inputnames = tZeile;
 
     ///read data to array
     for(int i= 0; i< filelength; ++i)
@@ -76,18 +107,28 @@ DataSet readfile(string filename, int columns)
         int field_start = 0;
         int field_end = 0;
 
-        for(int j = 0; j<columns; ++j)
-        {
-            field_end = line.find(',',field_end);
+        if(filename == inputs) for(int j = 0; j<columns; ++j)
+            {
+                field_end = line.find(',',field_end);
 
-            dump = line.substr(field_start, field_end - field_start);
-            field_start = ++field_end;
-            Zeile[i].data[j]= atof(dump.c_str());
-        }
+                dump = line.substr(field_start, field_end - field_start);
+                field_start = ++field_end;
+                tZeile[i].data[j]= dump.c_str();
+            }
+        else for(int j = 0; j<columns; ++j)
+            {
+                field_end = line.find(',',field_end);
+
+                dump = line.substr(field_start, field_end - field_start);
+                field_start = ++field_end;
+                Zeile[i].data[j]= atof(dump.c_str());
+            }
     }
     fin.close();
     return Result;
 }
+
+
 
 void printData(DataSet Sample)
 {
@@ -131,5 +172,5 @@ void writeDtoF(DataSet Sample, string filename)
     fout << str;
     fout.close();
 
-    cout << "File " << filename <<" successfully closed!\n" << Sample.Zeilenzahl << " Lines written!\n";
+    cout << "File " << filename <<" successfully closed! -- " << Sample.Zeilenzahl << " Lines written!\n";
 }
