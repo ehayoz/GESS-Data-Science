@@ -62,6 +62,12 @@ void pauseoutput(void)
 
 int main()
 {
+    ///runtime detection
+    clock_t t1,t2;
+    t1=clock();
+
+    ///initialize program
+
     DataSet target = readfile(inputs, 2); ///getting input target files, needs to be read as string. Maybe target names as well.
 
     DataSet* Set = new DataSet[target.Zeilenzahl]; ///Creating #Dataset pointers
@@ -83,11 +89,10 @@ int main()
 
     for(int i = 0; i < target.Zeilenzahl; ++i)
     {
-        printData(Set[i]); /// printing on the cmd window
+        ///printData(Set[i]); /// printing on the cmd window
         writeDtoF(Set[i], target.inputnames[i].data[1]); /// writing comma-separated to file
     }
-    cout << endl << target.Zeilenzahl << " files written\n";
-    pauseoutput();
+
 
 
 
@@ -100,6 +105,10 @@ int main()
     }
     delete[] Set;
 
+    t2=clock();
+    float diff ((float)t2-(float)t1);
+    cout << endl << target.Zeilenzahl << " files written -- time needed: " << diff/1000 << " s";
+    pauseoutput();
     return 0;
 }
 
@@ -132,7 +141,7 @@ DataSet readfile(string filename, int columns)
     Result.Fragen = qZeile;
 
     int n = 0; ///actual questionentry
-    double previous;
+    double previous = 0; ///Placeholder to save previus question tag
 
     ///read data to array
     for(int i= 0; i< filelength; ++i)
