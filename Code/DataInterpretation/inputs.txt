@@ -1,2 +1,1 @@
-Data_all.csv,Data_all_analyzed.csv
-Data_all.csv,Data_all_analyzed1.csv
+Data_all.csv,Masterfile in first line every other file follows up
