@@ -22,7 +22,7 @@ using namespace std::chrono;
 /*
 Information:
 The Data_all.csv output file contains its data in the following order:
-[Timestamp],[HR],[EDA],[TEMP],[Sound],[Dust],[#WiFi],[LON],[LAT],[Greenery]
+[Timestamp],[HR],[BVP],[EDA],[TempBF],[Sound],[Dust],[TempEN],[RH],[Light],[#WiFi],[LON],[LAT],[Greenery],[S No.],[Q1],[Q2],[Q3],[Q4],[Q5],[Q6],[Q7],[Q8],[Q9],[Q10],[Q11],[Q12]
 (Greenery is in the interval [0,1])
 The GPS_only.csv output file contains its data in the following order:
 [LON],[LAT]
@@ -43,36 +43,51 @@ float f_temp = 4;
 float f_gps = 1;
 float f_wc = 0.4;
 float f_ms = 0.016;
+float f_bvp = 64;
+float f_hobo = 1;
 
-ifstream fin[6];
+int epochFix = 3600;    // because conversion on our computer generate an error of 1h
+
+ifstream fin[9];
 const int N = (sizeof(fin)/sizeof(fin[0]));
 ofstream fout[2];
 int No = (sizeof(fout)/sizeof(fout[0]));
 long Tmin_i[N];
-int counter = 0;
+float green_prev = 0;
+int progress = 0;
+int r_vu = 100;
+int b_vu = 0;
 long minTime;
 long maxTime;
+long minQuestTime;
+long maxQuestTime;
 
 void init();
-void check();
 void concat();
 void cleanup();
 string getHR();
 string getEDA();
-string getTemp();
+string getTempBF();
 string getLAT(string);
 string getLON(string);
 string getSound(string);
 string getDust(string);
+string getTempEN(string);
+string getRH(string);
+string getLight(string);
+string getQuestion(string);
 string readLine(int, int);
 double time2stamp1(int,int);
 double time2stamp2(int,int);
-long getMinTime(bool);
+double time2stamp3(int,int);
+double time2stamp4(int,int);
+long checkMinTime(bool);
+long getMinQuestTime(bool);
 double WGStoCHx(double, double);
 double WGStoCHy(double, double);
 double DecToSexAngle(double);
 double ToSexAngle(double);
-double getGreen(double, double);
+float getGreen(double, double);
 int stoi(string);
 long stol(string);
 double stod(string);
@@ -101,43 +116,16 @@ void init() {
   fin[3].open("data/WifiScan.csv");
   fin[4].open("data/EDA.csv");
   fin[5].open("data/TEMP.csv");
+  fin[6].open("data/2016-04-08-1250_status.csv");   // TODO allgemein formulieren
+  fin[7].open("data/BVP.csv");
+  fin[8].open("data/Temp_RH_Light_10_11.csv");
   fout[0].open("data/Data_all.csv");
   fout[1].open("data/GPS_only.csv");
-  for(int i = 0; i < No; i++)
-	 fout[i].precision(15);
+  for(int i = 0; i < No; i++) {
+    fout[i].setf(ios::fixed,ios::floatfield);
+    fout[i].precision(4);
+  }
   image.save("img/map_chk.bmp");
-}
-
-void check() {
-	// Check File Input
-	string line;
-	int n, n_max;
-	cout << "Frequencies based on File Input (if frequencies differ from what they should, the devices did not log data for the same time span):\n\n";
-	for(int i = 0; i < N; i++) {
-		// Count lines
-		for (n = 0; std::getline(fin[i], line); n++)
-    		;
-
-		// Check if number of lines match with device frequencies
-		switch(i) {
-			case 0: n_max = n;
-					cout << "HR: " << endl;
-					break;
-			case 1: cout << "GPS: " << endl;
-					break;
-			case 2: cout << "WaspCity: " << endl;
-					break;
-			case 3: cout << "WiFi Scanner: " << endl;
-					break;
-			case 4: cout << "EDA: " << endl;
-					break;
-			case 5: cout << "TEMP: " << endl;
-					break;
-		}
-		cout << n << endl;
-    	cout << (float) n/n_max*f_hr << endl;
-    }
-    cout << endl;
 }
 
 void cleanup() {
@@ -148,33 +136,37 @@ void cleanup() {
 }
 
 void concat() {
-	minTime = getMinTime(true);
-	maxTime = getMinTime(false);
-	if(minTime >= maxTime)
-        cout << "Error: Start Time >= End Time. Check your input data and restart program." << endl;
+    // Check if all times overlap
+    minTime = checkMinTime(true);
+    maxTime = checkMinTime(false);
+    if(minTime >= maxTime)
+        cout << "Error: Start Time >= End Time. Check your input data and restart program." << endl << endl;
+    // But we will take the survey time as the reference:
+	minTime = getMinQuestTime(true);
+	maxTime = getMinQuestTime(false);
+
 	cout << "Press Enter to start concatenating the data and evaluate greenery";
-	cin.get();
+	//cin.get();
+	cout << "Loading...";
 	int m1 = 0 + 1; // [FIX, +1]
 	int m2 = 0 + 1; // fix empty line
 	int m3 = 0 + 1;
 	int m3_prev = 1;
+	int m4 = 0 + 3;
+	int m5 = 0;
 	int n_device = 0;
-	int progress = 0;
-	int progress_prev = 0;
+	bool first = true;
+	int progress_prev = -1;
 
 	double CHx;
 	double CHy;
 	double WGSx;
 	double WGSy;
-
 	image.save("img/map_chk.bmp");
 
-	//long t = minTime;
-
-	// Get to "common" time
-	// Base is HR (has to be specified in advance)
-
-	for(double t = minTime; t < maxTime; t += 1/f_hr) {
+	for(double t = minTime; t <= maxTime; t += 1/f_hr) {
+            //if(t >= 1460123239)// 1460123239
+            //    break;
 		progress = ceil((double)(t-minTime)/(maxTime - minTime)* 100);
 		if(progress != progress_prev) {
 			// Progress Bar, only cout if new progress to save time
@@ -184,19 +176,18 @@ void concat() {
 		}
 
 		// is for [Sound],[Dust],
-		while(time2stamp1(2,m2) <= t) {
+		while(time2stamp1(2,m2) < t) {
 			m2++;
 		}
 		// is for [LON],[LAT]
-		while(time2stamp1(1,m1) <= t) {
+		while(time2stamp1(1,m1) < t) {
 			m1++;
 		}
 		// is for [WiFi]
-		while(time2stamp2(3,m3) <= t) {
+		while(time2stamp2(3,m3) < t) {
 			m3++;
 		}
-
-		if(m3 != m3_prev)	// only refresh n_device if there is a new measure
+		if(m3 != m3_prev && !first)	// only refresh n_device if there is a new measure
 		{
 			n_device = m3 - m3_prev - 2;	// substract 2 because of our devices
 			//cout << "m3=" << m3 << endl << "m3_prev=" << m3_prev << endl << "n_device=" << n_device << endl; cin.get();
@@ -204,6 +195,19 @@ void concat() {
 
 		if(n_device < 0)
 			n_device = 0;
+
+        // is for [TempEN],[RH],[Light]
+        while(time2stamp4(8,m4) < t) {
+            m4++;
+        }
+        // is for [Survey]
+        while(time2stamp3(6,m5) < t) {
+            if(time2stamp3(6,m5 + 1) < t)
+               m5++;
+            else
+                break;
+        }
+        //cin.get();
 
 		// Conversion WGS to CH
 		if(getLON(readLine(1,m1)).compare("") == 0)
@@ -217,22 +221,32 @@ void concat() {
 			CHy = WGStoCHx(stod(getLAT(readLine(1,m1))) , stod(getLON(readLine(1,m1))));
 		}
 
-		// FOUT [Time],[HR],[EDA],[Temp],						[FIX,-1]									[FIX,-1]
-		fout[0] << t << ',' << readLine(0, (t-Tmin_i[0])*f_hr+2-1) << ',' << readLine(4, (t-Tmin_i[4])*f_eda+2-1) << ',' << readLine(5, (t-Tmin_i[5])*f_temp+2) << ','
+		// FOUT [Timestamp],[HR],[BVP],[EDA],[TempBF],
+		fout[0] << t << ',' << readLine(0, (t-Tmin_i[0])*f_hr+2) << ',' << readLine(7, (t-Tmin_i[7])*f_bvp+2) << ',' << readLine(4, (t-Tmin_i[4])*f_eda+2) << ',' << readLine(5, (t-Tmin_i[5])*f_temp+2) << ','
 		// FOUT [Sound],[Dust],
 			 << getSound(readLine(2,m2)) << ',' << getDust(readLine(2,m2)) << ','
-		// FOUT [WiFi]
+        // FOUT [TempEN],[RH],[Light],
+             << getTempEN(readLine(8,m4)) << ',' << getRH(readLine(8,m4)) << ',' << getLight(readLine(8,m4)) << ','
+		// FOUT [#WiFi]
 			 << n_device << ','
 	    // FOUT [LON],[LAT]
 			 // << getLON(readLine(1,m1)) << ',' << getLAT(readLine(1,m1)) << endl;
 			 << CHx << ',' << CHy << ','
-        // FOUT [Green]
-			 << getGreen(CHx,CHy) << endl;
+        // FOUT [Greenery]
+			 //<< (float) round(getGreen(CHx,CHy)*10000)/10000
+			 << ','
+        // FOUT [S No],[Q1],[Q2],[Q3],[Q4],[Q5],[Q6],[Q7],[Q8],[Q9],[Q10],[Q11],[Q12]
+             << getQuestion(readLine(6,m5)) << endl;
 
 	    // FOUT [LON],[LAT]
 		fout[1] << CHx << ',' << CHy << endl;
 
+		// RGB value updater, from R -> B
+		r_vu -= (float)((t-minTime)/(maxTime-minTime))*100;
+		b_vu += (float)((t-minTime)/(maxTime-minTime))*100;
+
 		m3_prev = m3;
+		first = false;
 	}
 	cout  << " ...Success!" << endl << endl;
     CImgDisplay main_disp(image_chk,"Check Image");
@@ -338,6 +352,58 @@ string getSound(string line) {
 	return line.substr(field_start, field_end - field_start);
 }
 
+string getTempEN(string line) {
+	int field_start = 0;
+	int field_end = 0;
+	// find "starting" comma
+	for(int i = 0; i < 2; i++)
+		field_start = line.find(',',field_start+1) + 1;
+
+	// find "ending" comma
+	field_end = line.find(',',field_start+1);
+
+    return line.substr(field_start, field_end - field_start);
+}
+// problem: 2841,04/08/16 01:47:20 PM,12.775,46.367,2321.8,,,
+string getRH(string line) {
+	int field_start = 0;
+	int field_end = 0;
+	// find "starting" comma
+	for(int i = 0; i < 3; i++)
+		field_start = line.find(',',field_start+1) + 1;
+
+	// find "ending" comma
+	field_end = line.find(',',field_start+1);
+
+    return line.substr(field_start, field_end - field_start);
+}
+
+string getLight(string line) {
+	int field_start = 0;
+	int field_end = 0;
+	// find "starting" comma
+	for(int i = 0; i < 4; i++)
+		field_start = line.find(',',field_start+1) + 1;
+
+	// find "ending" comma
+	field_end = line.find(',',field_start+1);
+
+    return line.substr(field_start, field_end - field_start);
+}
+
+string getQuestion(string line) {
+	int field_start = 0;
+	//int field_end = 0;
+	// find "starting" comma
+	for(int i = 0; i < 1; i++)
+		field_start = line.find(',',field_start+1) + 1;
+
+	// find "ending" comma
+	//field_end = line.find(',',field_start+1);
+
+    return line.substr(field_start);
+}
+
 double time2stamp1(int n_i, int m) {
 	// only for files with the following format:
 	// 2016_03_14_15_32_19_681, ...
@@ -425,7 +491,7 @@ double time2stamp2(int n_i, int m) {
 
 	int field_start = 0;
 	// find "starting" apostroph
-	for(int i = 0; i < 2; i++)
+	for(int i = 0; i < 1; i++)
 		field_start = line.find('"',field_start+1);
 	field_start++;
 
@@ -450,8 +516,21 @@ double time2stamp2(int n_i, int m) {
 	referenceDateComponent.tm_year = stoi(line.substr(field_start+2,2)) + 100;
 	referenceDateComponent.tm_mon = stoi(line.substr(field_start+5,2)) - 1;
 	referenceDateComponent.tm_mday = stoi(line.substr(field_start+8,2));
-	time_t readDate = mktime(&referenceDateComponent);
+//	if(n_i == 3 && m == -1) {
+//            cout << field_start << endl;
+//            cout << "Entries:\n";
+//            cout << line << endl;
+//        cout << stoi(line.substr(field_start+11,2)) << endl;
+//        cout << stoi(line.substr(field_start+14,2)) << endl;
+//        cout << stoi(line.substr(field_start+17,2)) << endl;
+//        cout << stoi(line.substr(field_start+2,2)) + 100 << endl;
+//        cout << stoi(line.substr(field_start+5,2)) - 1 << endl;
+//        cout << stoi(line.substr(field_start+8,2)) << endl;
+//    cout << "----\n";
+//	}
 
+    //cout << referenceDateComponent.tm_hour << endl; cin.get();
+	time_t readDate = mktime(&referenceDateComponent);
 	// Print string to check
 	//char buff[20];
 	//strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&referenceDate));
@@ -463,7 +542,153 @@ double time2stamp2(int n_i, int m) {
 	return seconds;
 }
 
-long getMinTime(bool min) {
+
+double time2stamp3(int n_i, int m) {
+	// only for files with the following format:
+	// 2016-04-08 13:23:30.435916, ...
+
+	// n_i: Which fin
+	// m: Which line, starting from 0
+
+  	// Reference Date (01.01.1970)
+	struct tm referenceDateComponent = {0};
+	referenceDateComponent.tm_hour = 0;
+	referenceDateComponent.tm_min = 0;
+	referenceDateComponent.tm_sec = 0;
+	referenceDateComponent.tm_year = 70;
+	referenceDateComponent.tm_mon = 1;
+	referenceDateComponent.tm_mday = 1;
+	time_t referenceDate = mktime(&referenceDateComponent);
+
+	// Ignore empty lines
+	/*string line = "";
+	while(line.size() < 10) {
+		std::getline(fin[n_i], line);
+	}*/
+
+	string line = readLine(n_i,m);
+
+	int field_start = 0;
+	// find "starting" apostroph
+	//for(int i = 0; i < 2; i++)
+	//	field_start = line.find('"',field_start+1);
+	//field_start++;
+
+	// Read File Date
+//	int tmp;
+//	if ( ! (istringstream(line.substr(field_start+11,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_hour = tmp;
+//	if ( ! (istringstream(line.substr(field_start+14,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_min = tmp;
+//	if ( ! (istringstream(line.substr(field_start+17,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_sec = tmp;
+//	if ( ! (istringstream(line.substr(field_start+2,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_year = tmp + 100;
+//	if ( ! (istringstream(line.substr(field_start+5,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_mon = tmp - 1;
+//	if ( ! (istringstream(line.substr(field_start+8,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_mday = tmp;
+//	time_t readDate = mktime(&referenceDateComponent);
+	referenceDateComponent.tm_hour = stoi(line.substr(field_start+11,2));
+	referenceDateComponent.tm_min = stoi(line.substr(field_start+14,2));
+	referenceDateComponent.tm_sec = stoi(line.substr(field_start+17,2));
+	referenceDateComponent.tm_year = stoi(line.substr(field_start+2,2)) + 100;
+	referenceDateComponent.tm_mon = stoi(line.substr(field_start+5,2)) - 1;
+	referenceDateComponent.tm_mday = stoi(line.substr(field_start+8,2));
+	time_t readDate = mktime(&referenceDateComponent);
+	//cout << referenceDateComponent.tm_year << endl; cin.get();
+    //cout << referenceDateComponent.tm_mon << endl; cin.get();
+    //cout << referenceDateComponent.tm_mday << endl; cin.get();
+    //cout << referenceDateComponent.tm_hour << endl; cin.get();
+    //cout << referenceDateComponent.tm_min << endl; cin.get();
+    //cout << referenceDateComponent.tm_sec << endl; cin.get();
+
+	// Print string to check
+	//char buff[20];
+	//strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&referenceDate));
+	//cout << buff << endl;
+
+	// Conversion Time to UNIX-Timestamp
+  	double seconds = difftime(readDate,referenceDate) + 31*24*3600; // fix month
+  	//cout.precision(10);
+  	//cout << seconds << endl; cin.get();
+
+	return seconds;
+}
+
+double time2stamp4(int n_i, int m) {
+	// only for files with the following format:
+	// 1898,04/08/16 01:31:37 PM,13.642,45.415,4868.2,,, , ...
+
+	// n_i: Which fin
+	// m: Which line, starting from 0
+
+  	// Reference Date (01.01.1970)
+	struct tm referenceDateComponent = {0};
+	referenceDateComponent.tm_hour = 0;
+	referenceDateComponent.tm_min = 0;
+	referenceDateComponent.tm_sec = 0;
+	referenceDateComponent.tm_year = 70;
+	referenceDateComponent.tm_mon = 1;
+	referenceDateComponent.tm_mday = 1;
+	time_t referenceDate = mktime(&referenceDateComponent);
+
+	// Ignore empty lines
+	/*string line = "";
+	while(line.size() < 10) {
+		std::getline(fin[n_i], line);
+	}*/
+
+	string line = readLine(n_i,m);
+
+	int field_start = 0;
+	// find "starting" apostroph
+	for(int i = 0; i < 1; i++)
+		field_start = line.find(',',field_start+1);
+	field_start++;
+
+	// Read File Date
+//	int tmp;
+//	if ( ! (istringstream(line.substr(field_start+11,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_hour = tmp;
+//	if ( ! (istringstream(line.substr(field_start+14,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_min = tmp;
+//	if ( ! (istringstream(line.substr(field_start+17,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_sec = tmp;
+//	if ( ! (istringstream(line.substr(field_start+2,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_year = tmp + 100;
+//	if ( ! (istringstream(line.substr(field_start+5,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_mon = tmp - 1;
+//	if ( ! (istringstream(line.substr(field_start+8,2)) >> tmp) ) tmp = 0;
+//	referenceDateComponent.tm_mday = tmp;
+//	time_t readDate = mktime(&referenceDateComponent);
+	referenceDateComponent.tm_min = stoi(line.substr(field_start+12,2));
+	referenceDateComponent.tm_sec = stoi(line.substr(field_start+15,2));
+	referenceDateComponent.tm_year = stoi(line.substr(field_start+6,2)) + 100;
+	referenceDateComponent.tm_mon = stoi(line.substr(field_start+0,2)) - 1;
+	referenceDateComponent.tm_mday = stoi(line.substr(field_start+3,2));
+	if(line.substr(field_start+18,2) == "PM") {
+        referenceDateComponent.tm_hour = stoi(line.substr(field_start+9,2)) + 12;
+	}
+    else
+        referenceDateComponent.tm_hour = stoi(line.substr(field_start+9,2));
+
+	time_t readDate = mktime(&referenceDateComponent);
+
+	// Print string to check
+	//char buff[20];
+	//strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&referenceDate));
+	//cout << buff << endl;
+
+	// Conversion Time to UNIX-Timestamp
+  	double seconds = difftime(readDate,referenceDate) + 31*24*3600; // fix month
+  	//cout.precision(10);
+  	//cout << seconds << endl; cin.get();
+
+	return seconds;
+}
+
+long checkMinTime(bool min) {
 	if(min) {
 		long T_min = 0;
 //        long tmp;
@@ -476,15 +701,18 @@ long getMinTime(bool min) {
 //		Tmin_i[4] = tmp;		// EDA
 //        if ( ! (istringstream(readLine(5,0)) >> tmp) ) tmp = 0;
 //		Tmin_i[5] = tmp;		// TEMP
-		Tmin_i[0] = stol(readLine(0,0));	// HR
+		Tmin_i[0] = stol(readLine(0,0)) + epochFix;	// HR
 		Tmin_i[1] = time2stamp1(1,0+1);		// GPS
 		Tmin_i[2] = time2stamp1(2,0+1);		// WaspCity
 		Tmin_i[3] = time2stamp2(3,0+1);		// WiFi Scanner
-		Tmin_i[4] = stol(readLine(4,0));		// EDA
-		Tmin_i[5] = stol(readLine(5,0));		// TEMP
+		Tmin_i[4] = stol(readLine(4,0)) + epochFix;		// EDA
+		Tmin_i[5] = stol(readLine(5,0)) + epochFix;		// TEMP
+		Tmin_i[6] = time2stamp3(6,0);       // Survey
+		Tmin_i[7] = stol(readLine(7,0)) + epochFix;    // BVP
+		Tmin_i[8] = time2stamp4(8,0+3+6);   // HOBO
 
 		cout << "Order of the times below:" << endl
-		<< "HR\nGPS\nWaspCity\nWiFi\nEDA\nTEMP\n\n";
+		<< "HR\nGPS\nWaspCity\nWiFi\nEDA\nTEMP\nSurvey\nBVP\nHOBO\n\n";
 		cout << "Start Times:" << endl;
 		for(int i = 0; i < N; i++) {
 			cout << Tmin_i[i] << endl;
@@ -518,12 +746,15 @@ long getMinTime(bool min) {
 //		T_i[4] = tmp + N_T[4]*f_eda;		// EDA
 //        if ( ! (istringstream(readLine(5,0)) >> tmp) ) tmp = 0;
 //		T_i[5] = tmp + N_T[0]*f_temp;		// TEMP
-		T_i[0] = stol(readLine(0,0)) + N_T[0]*f_hr;
+		T_i[0] = stol(readLine(0,0)) + N_T[0]/f_hr + epochFix;
 		T_i[1] = time2stamp1(1,-1);
 		T_i[2] = time2stamp1(2,-1);
 		T_i[3] = time2stamp2(3,-1);
-		T_i[4] = stol(readLine(4,0)) + N_T[4]*f_eda;		// EDA
-		T_i[5] = stol(readLine(5,0)) + N_T[0]*f_temp;		// TEMP
+		T_i[4] = stol(readLine(4,0)) + N_T[4]/f_eda + epochFix;		// EDA
+		T_i[5] = stol(readLine(5,0)) + N_T[5]/f_temp + epochFix;		// TEMP
+		T_i[6] = time2stamp3(6,-1);       // Survey
+		T_i[7] = stol(readLine(7,0)) + N_T[7]/f_bvp + epochFix;
+		T_i[8] = time2stamp4(8,-1);
 
 		cout << "End Times:" << endl;
 		for(int i = 0; i < N; i++) {
@@ -534,6 +765,13 @@ long getMinTime(bool min) {
 		cout << endl;
 		return T_max;
 	}
+}
+
+long getMinQuestTime(bool min) {
+    if(min)
+        return time2stamp3(6,0);       // Survey
+    else
+        return time2stamp3(6,-1);       // Survey
 }
 
 // Convert WGS lat/long (° dec) to CH x
@@ -589,10 +827,10 @@ double ToSexAngle(double val) {
     return min*60 + deg*3600;
 }
 
-double getGreen(double CHx, double CHy) {
+float getGreen(double CHx, double CHy) {
     // CHx ~ 600000, CHy ~ 200000
     if(CHx == 0 && CHy == 0)    // no GPS data available
-        return -1;
+        return green_prev;
 
     // Rescale: 334 Pixel ~ 90 Meters
     double m2p = 334./90.;
@@ -617,7 +855,7 @@ double getGreen(double CHx, double CHy) {
                     x = px + j;
                     y = py + i;
                     if((x < 0) || (y < 0) || (x >= image_h) || (y >= image_w))  // Pixel outside image
-                        return -1;
+                        return green_prev;
                     // Calculate Greenery
                     unsigned char r = image(y, x, 0, 0);
                     unsigned char g = image(y, x, 0, 1);
@@ -629,9 +867,10 @@ double getGreen(double CHx, double CHy) {
                             // obviously green pixel
                             greenMat[y][x] = true;
                         }
-                    else
+                    else {
                         // no green pixel
                         greenMat[y][x] = false;
+                    }
                 }
         }
 
@@ -664,8 +903,12 @@ double getGreen(double CHx, double CHy) {
             if((i*i + j*j) < (r*r)) {
                 // sum up #pixels of circle
                 pixTot++;
-                // Mark walk
-                const float color[] = {0.0,0.0,255.0};
+                // Mark walk, progressive
+                //unsigned char r = image(y, x, 0, 0);
+                //unsigned char g = image(y, x, 0, 1);
+                //unsigned char b = image(y, x, 0, 2);
+                const float color[] = {0,0,230};
+
                 image_chk.draw_point(y,x,color);
                 if(greenMat[y][x]) {
                     // sum up #pixels which are green
@@ -728,7 +971,8 @@ double getGreen(double CHx, double CHy) {
         }
     }
 */
-	return (double)pixMatch/pixTot;
+    green_prev = (float)pixMatch/pixTot;
+	return green_prev;
 }
 
 int stoi(string s) {
