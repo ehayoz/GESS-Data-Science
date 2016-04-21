@@ -37,22 +37,24 @@ Temperature			temp
 */
 
 // Measurement Period [s]
-float f_hr = 1; // HR only with 1Hz!
-float f_eda = 4;
-float f_temp = 4;
-float f_gps = 1;
-float f_wc = 0.4;
-float f_ms = 0.016;
-float f_bvp = 64;
-float f_hobo = 1;
+const float f_hr = 1; // HR only with 1Hz!
+const float f_eda = 4;
+const float f_temp = 4;
+const float f_gps = 1;
+const float f_wc = 0.4;
+const float f_ms = 0.016;
+const float f_bvp = 64;
+const float f_hobo = 1;
 
-int epochFix = 3600;    // because conversion on our computer generate an error of 1h
+int epochFix = 2*3600;    // because conversion on our computer generate an error of 1h
 
 ifstream fin[9];
 const int N = (sizeof(fin)/sizeof(fin[0]));
 ofstream fout[2];
 int No = (sizeof(fout)/sizeof(fout[0]));
 long Tmin_i[N];
+float bvp[(int)f_bvp];
+float bvp_avg;
 float green_prev = 0;
 int progress = 0;
 int r_vu = 100;
@@ -61,12 +63,16 @@ long minTime;
 long maxTime;
 long minQuestTime;
 long maxQuestTime;
+long minSurvTime;
+long maxSurvTime;
 
 void init();
 void concat();
 void cleanup();
 string getHR();
-string getEDA();
+float getEDA(int);
+float getBVP(int);
+void setBVPavg();
 string getTempBF();
 string getLAT(string);
 string getLON(string);
@@ -88,9 +94,12 @@ double WGStoCHy(double, double);
 double DecToSexAngle(double);
 double ToSexAngle(double);
 float getGreen(double, double);
+void updateWindow(void);
 int stoi(string);
 long stol(string);
 double stod(string);
+float stof(string);
+string to_string(int);
 
 CImg<unsigned char> image("img/map.bmp");
 CImg<unsigned char> image_chk("img/map_chk.bmp");
@@ -98,34 +107,58 @@ int image_h = image.height();
 int image_w = image.width();
 vector< vector<bool> > greenMat(image_h, vector<bool>(image_w));
 
+int partInt;
+string partStr;
+bool error = false;
+string history;
 
 int main(int argc, char** argv) {
+    for(partInt = 8; partInt <= 21; partInt++) {
+        init();
+        if(!error && partInt != 12) {
+            concat();
+            cleanup();
+        }
+        else
+            error = false;
+    }
 
-	init();
-	concat();
-	//check();
-
-	cleanup();
 	return 0;
 }
 
 void init() {
-  fin[0].open("data/HR.csv");
-  fin[1].open("data/GPS.csv");
-  fin[2].open("data/WaspCity.csv");
-  fin[3].open("data/WifiScan.csv");
-  fin[4].open("data/EDA.csv");
-  fin[5].open("data/TEMP.csv");
-  fin[6].open("data/2016-04-08-1250_status.csv");   // TODO allgemein formulieren
-  fin[7].open("data/BVP.csv");
-  fin[8].open("data/Temp_RH_Light_10_11.csv");
-  fout[0].open("data/Data_all.csv");
-  fout[1].open("data/GPS_only.csv");
+  partStr = to_string(partInt);
+  if(partStr.size() == 1)
+    partStr = "0" + partStr;
+  cout << "Participant: " + partStr + ". ";
+  fin[0].open("data/" + partStr + "/HR.csv");
+  fin[1].open("data/" + partStr + "/GPS.csv");
+  fin[2].open("data/" + partStr + "/WaspCity.csv");
+  fin[3].open("data/" + partStr + "/WifiScan.csv");
+  fin[4].open("data/" + partStr + "/EDA.csv");
+  fin[5].open("data/" + partStr + "/TEMP.csv");
+  fin[6].open("data/" + partStr + "/status.csv");// "/status.csv");
+  fin[7].open("data/" + partStr + "/BVP.csv");
+  fin[8].open("data/" + partStr + "/Temp_RH_Light.csv");// "/Temp_RH_Light.csv");
+  fout[0].open("output/" + partStr + "/data_all.csv");
+  fout[1].open("output/" + partStr + "/GPS_only.csv");
+
   for(int i = 0; i < No; i++) {
     fout[i].setf(ios::fixed,ios::floatfield);
-    fout[i].precision(4);
+    fout[i].precision(6);
   }
   image.save("img/map_chk.bmp");
+      // Check if all times overlap
+    minTime = checkMinTime(true);
+    maxTime = checkMinTime(false);
+    //cout << "minDuration: " << (float)(maxTime - minTime)/60 << "minutes" << endl;
+    cout << "Status: ";
+    if((checkMinTime(true) > minSurvTime || checkMinTime(false) < maxSurvTime)) {
+        cout << "ERROR. Progress: ----------- ABORTED." << endl;
+        error = true;
+    }
+    else
+        cout << "READY. Progress: ";
 }
 
 void cleanup() {
@@ -136,18 +169,11 @@ void cleanup() {
 }
 
 void concat() {
-    // Check if all times overlap
-    minTime = checkMinTime(true);
-    maxTime = checkMinTime(false);
-    if(minTime >= maxTime)
-        cout << "Error: Start Time >= End Time. Check your input data and restart program." << endl << endl;
+    // In init we already did a check
     // But we will take the survey time as the reference:
 	minTime = getMinQuestTime(true);
 	maxTime = getMinQuestTime(false);
 
-	cout << "Press Enter to start concatenating the data and evaluate greenery";
-	//cin.get();
-	cout << "Loading...";
 	int m1 = 0 + 1; // [FIX, +1]
 	int m2 = 0 + 1; // fix empty line
 	int m3 = 0 + 1;
@@ -157,21 +183,22 @@ void concat() {
 	int n_device = 0;
 	bool first = true;
 	int progress_prev = -1;
+    setBVPavg();
 
 	double CHx;
 	double CHy;
 	double WGSx;
 	double WGSy;
-	image.save("img/map_chk.bmp");
 
-	for(double t = minTime; t <= maxTime; t += 1/f_hr) {
+	for(double t = minSurvTime; t <= maxSurvTime; t += 1/f_hr) {    // minTime
             //if(t >= 1460123239)// 1460123239
             //    break;
-		progress = ceil((double)(t-minTime)/(maxTime - minTime)* 100);
+		progress = ceil((double)(t-minSurvTime)/(maxSurvTime - minSurvTime)* 100);
 		if(progress != progress_prev) {
 			// Progress Bar, only cout if new progress to save time
-			system("CLS");
-			cout << "Generating Data Files. " << "Progress: " << progress << "%";
+			if(progress%10 == 0)
+                cout << "|";
+            //cout << progress << endl;
 			progress_prev = progress;
 		}
 
@@ -202,12 +229,11 @@ void concat() {
         }
         // is for [Survey]
         while(time2stamp3(6,m5) < t) {
-            if(time2stamp3(6,m5 + 1) < t)
+            if(time2stamp3(6,m5 + 1) <= t)
                m5++;
             else
                 break;
         }
-        //cin.get();
 
 		// Conversion WGS to CH
 		if(getLON(readLine(1,m1)).compare("") == 0)
@@ -222,7 +248,7 @@ void concat() {
 		}
 
 		// FOUT [Timestamp],[HR],[BVP],[EDA],[TempBF],
-		fout[0] << t << ',' << readLine(0, (t-Tmin_i[0])*f_hr+2) << ',' << readLine(7, (t-Tmin_i[7])*f_bvp+2) << ',' << readLine(4, (t-Tmin_i[4])*f_eda+2) << ',' << readLine(5, (t-Tmin_i[5])*f_temp+2) << ','
+		fout[0] << t << ',' << readLine(0, (t-Tmin_i[0])*f_hr+2) << ',' << getBVP((t-Tmin_i[7])*f_bvp+2) << ',' << getEDA((t-Tmin_i[4])*f_eda+2) << ',' << readLine(5, (t-Tmin_i[5])*f_temp+2) << ','
 		// FOUT [Sound],[Dust],
 			 << getSound(readLine(2,m2)) << ',' << getDust(readLine(2,m2)) << ','
         // FOUT [TempEN],[RH],[Light],
@@ -233,8 +259,8 @@ void concat() {
 			 // << getLON(readLine(1,m1)) << ',' << getLAT(readLine(1,m1)) << endl;
 			 << CHx << ',' << CHy << ','
         // FOUT [Greenery]
-			 //<< (float) round(getGreen(CHx,CHy)*10000)/10000
-			 << ','
+			 //<< (float) round(getGreen(CHx,CHy)*10000)/10000 << ','
+			 << 0 << ','
         // FOUT [S No],[Q1],[Q2],[Q3],[Q4],[Q5],[Q6],[Q7],[Q8],[Q9],[Q10],[Q11],[Q12]
              << getQuestion(readLine(6,m5)) << endl;
 
@@ -248,11 +274,12 @@ void concat() {
 		m3_prev = m3;
 		first = false;
 	}
-	cout  << " ...Success!" << endl << endl;
-    CImgDisplay main_disp(image_chk,"Check Image");
-	image_chk.save("img/map_chk.bmp");
-	while (!main_disp.is_closed())
-        main_disp.wait();
+	//cout  << " ...Success!" << endl << endl;
+    //CImgDisplay main_disp(image_chk,"Check Image");
+	//image_chk.save("img/map_chk.bmp");
+	//while (!main_disp.is_closed())
+    //    main_disp.wait();
+    cout << " COMPLETE." << endl;
 }
 
 string readLine(int n_i, int m) {
@@ -402,6 +429,36 @@ string getQuestion(string line) {
 	//field_end = line.find(',',field_start+1);
 
     return line.substr(field_start);
+}
+
+float getBVP(int n) {
+    // Solution to aliasing problems
+    float sum = 0;
+    float avg;
+    sum = 0;
+    for(int i = 0; i < f_bvp; i++) {
+        sum += abs(bvp[i] + bvp_avg);
+    }
+    return sum/f_bvp;
+}
+
+void setBVPavg() {
+    double sum = 0;
+    int startLine = (minTime-Tmin_i[7])*f_bvp+2;
+    int i;
+    for(i = 0; i < (float)(maxTime-minTime)*.035*f_bvp; i++) {
+        sum += stof(readLine(7,startLine + i));
+    }
+    bvp_avg = sum/i;
+}
+
+float getEDA(int n) {
+    // Get the mean
+    float sum = 0;
+    for(int i = 0; i < f_eda; i++) {
+        sum += stof(readLine(4,n+i));
+    }
+    return sum/f_eda;
 }
 
 double time2stamp1(int n_i, int m) {
@@ -710,16 +767,17 @@ long checkMinTime(bool min) {
 		Tmin_i[6] = time2stamp3(6,0);       // Survey
 		Tmin_i[7] = stol(readLine(7,0)) + epochFix;    // BVP
 		Tmin_i[8] = time2stamp4(8,0+3+6);   // HOBO
+		minSurvTime = Tmin_i[6];
 
-		cout << "Order of the times below:" << endl
+		/*cout << endl << "Order of the times below:" << endl
 		<< "HR\nGPS\nWaspCity\nWiFi\nEDA\nTEMP\nSurvey\nBVP\nHOBO\n\n";
-		cout << "Start Times:" << endl;
+		cout << "Start Times:" << endl;*/
 		for(int i = 0; i < N; i++) {
-			cout << Tmin_i[i] << endl;
-			if(Tmin_i[i] > T_min)
+			//cout << Tmin_i[i] << endl;
+			if(Tmin_i[i] > T_min && i != 6) // exclude the survey one
 				T_min = Tmin_i[i];
 		}
-		cout << endl;
+		//cout << endl;
 		return T_min;
 	}
 	else {
@@ -755,14 +813,15 @@ long checkMinTime(bool min) {
 		T_i[6] = time2stamp3(6,-1);       // Survey
 		T_i[7] = stol(readLine(7,0)) + N_T[7]/f_bvp + epochFix;
 		T_i[8] = time2stamp4(8,-1);
+		maxSurvTime = T_i[6];
 
-		cout << "End Times:" << endl;
+		//cout << "End Times:" << endl;
 		for(int i = 0; i < N; i++) {
-			cout << T_i[i] << endl;
-			if(T_i[i] < T_max)
+			//cout << T_i[i] << endl;
+			if(T_i[i] < T_max && i != 6)    // exclude the survey one
 				T_max = T_i[i];
 		}
-		cout << endl;
+		//cout << endl;
 		return T_max;
 	}
 }
@@ -856,14 +915,17 @@ float getGreen(double CHx, double CHy) {
                     y = py + i;
                     if((x < 0) || (y < 0) || (x >= image_h) || (y >= image_w))  // Pixel outside image
                         return green_prev;
+
                     // Calculate Greenery
-                    unsigned char r = image(y, x, 0, 0);
-                    unsigned char g = image(y, x, 0, 1);
-                    unsigned char b = image(y, x, 0, 2);
+                    unsigned char r_ = image(y, x, 0, 0);
+                    unsigned char g_ = image(y, x, 0, 1);
+                    unsigned char b_ = image(y, x, 0, 2);
+                    float color[] = {0.0,0.0,255.0};
+                    image_chk.draw_point(y,x,color);
 
                     // Rule for detecting green of trees, grass etc.
-                    if((r > 10 && g > 10 && b > 10) &&
-                        (rAmount*r < g && bAmount*b < g)) {
+                    if((r_ > 10 && g_ > 10 && b_ > 10) &&
+                        (rAmount*r_ < g_ && bAmount*b_ < g_)) {
                             // obviously green pixel
                             greenMat[y][x] = true;
                         }
@@ -975,6 +1037,11 @@ float getGreen(double CHx, double CHy) {
 	return green_prev;
 }
 
+void updateWindow(void) {
+    system("CLS");
+    cout << history;
+}
+
 int stoi(string s) {
     int i;
     if ( ! (istringstream(s) >> i) ) i = 0;
@@ -991,6 +1058,18 @@ double stod(string s) {
     double d;
     if ( ! (istringstream(s) >> d) ) d = 0;
     return d;
+}
+
+float stof(string s) {
+    float d;
+    if ( ! (istringstream(s) >> d) ) d = 0;
+    return d;
+}
+
+string to_string(int num) {
+    stringstream ss;
+    ss << num;
+    return ss.str();
 }
 
 
